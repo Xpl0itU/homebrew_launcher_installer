@@ -534,6 +534,8 @@ static void loadFunctionPointers(private_data_t * private_data) {
     OS_FIND_EXPORT(sysapp_handle, "SYSRelaunchTitle", private_data->SYSRelaunchTitle);
 }
 
+__attribute__((section(".bss"))) uint32_t past_initial_load = 0;
+
 int _start(int argc, char **argv) {
     private_data_t private_data;
 
@@ -567,7 +569,35 @@ int _start(int argc, char **argv) {
                         tid == 0x000500101004A100L || // mii maker usa
                         tid == 0x000500101004A000L) {   // mii maker jpn
 
-                        LoadFileToMem(&private_data, CAFE_OS_SD_PATH WIIU_PATH "/apps/homebrew_launcher/homebrew_launcher.elf", &pElfBuffer, &uiElfSize);
+                        //DIY paths to save bytes
+                        //the boot.bin path has the sd:/apps/homebrew_launcher bits,
+                        //by overwiting it on the stack we can borrow "homebrew_launcher.elf"
+                        //from the OSFatal call below
+                        #define COPYSTR(x, sub) { \
+                            private_data.memcpy(work, x, sizeof(x)-sub); \
+                            work += sizeof(x)-sub; \
+                        }
+
+                        char hblpath[128];
+                        char* work = hblpath;
+                        COPYSTR(CAFE_OS_SD_PATH WIIU_PATH "/apps/homebrew_launcher/boot.bin", 1);
+                        work -= 8;
+                        COPYSTR("homebrew_launcher.elf", 0);
+
+                        if (past_initial_load != 0xCAFEC0DE) {
+                            unsigned char* pCfgBuffer = NULL;
+                            unsigned int uiCfgSize = 0;
+                            LoadFileToMem(&private_data, CAFE_OS_SD_PATH WIIU_PATH "/apps/homebrew_launcher/boot.bin", &pCfgBuffer, &uiCfgSize);
+                            if (pCfgBuffer) {
+                                LoadFileToMem(&private_data, (char*)pCfgBuffer, &pElfBuffer, &uiElfSize);
+                                past_initial_load = 0xCAFEC0DE;
+                                private_data.MEMFreeToDefaultHeap(pCfgBuffer);
+                            }
+                        }
+
+                        if (!pElfBuffer) {
+                            LoadFileToMem(&private_data, hblpath, &pElfBuffer, &uiElfSize);
+                        }
                     }else{
                         break;
                     }
