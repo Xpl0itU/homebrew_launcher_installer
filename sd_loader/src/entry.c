@@ -373,17 +373,10 @@ static int LoadFileToMem(private_data_t *private_data, const char *filepath, uns
         char mountPath[FS_MAX_MOUNTPATH_SIZE];
 
         int status = private_data->FSGetMountSource(pClient, pCmd, 0, tempPath, -1);
-        if (status != 0) {
-            private_data->OSFatal("-13");
-        }
-        status = private_data->FSMount(pClient, pCmd, tempPath, mountPath, FS_MAX_MOUNTPATH_SIZE, -1);
+        status |= private_data->FSMount(pClient, pCmd, tempPath, mountPath, FS_MAX_MOUNTPATH_SIZE, -1);
+        status |= private_data->FSOpenFile(pClient, pCmd, filepath, "r", &iFd, -1);
         if(status != 0) {
-            private_data->OSFatal("-12");
-        }
-
-        status = private_data->FSOpenFile(pClient, pCmd, filepath, "r", &iFd, -1);
-        if(status != 0) {
-            private_data->OSFatal("-11");
+            return 0;
         }
 
         FSStat stat;
@@ -396,7 +389,7 @@ static int LoadFileToMem(private_data_t *private_data, const char *filepath, uns
         if (stat.size > 0) {
             pBuffer = private_data->MEMAllocFromDefaultHeapEx((stat.size + 0x3F) & ~0x3F, 0x40);
         } else {
-            private_data->OSFatal("-10");
+            return 0;
         }
 
         unsigned int done = 0;
@@ -452,6 +445,8 @@ static unsigned int load_elf_image (private_data_t *private_data, unsigned char 
     unsigned char *image;
     int i;
 
+    if (!elfstart) return 0;
+
     ehdr = (Elf32_Ehdr *) elfstart;
 
     if(ehdr->e_phoff == 0 || ehdr->e_phnum == 0)
@@ -485,11 +480,7 @@ static unsigned int load_elf_image (private_data_t *private_data, unsigned char 
     //! clear BSS
     Elf32_Shdr *shdr = (Elf32_Shdr *) (elfstart + ehdr->e_shoff);
     for(i = 0; i < ehdr->e_shnum; i++) {
-        const char *section_name = ((const char*)elfstart) + shdr[ehdr->e_shstrndx].sh_offset + shdr[i].sh_name;
-        if(section_name[0] == '.' && section_name[1] == 'b' && section_name[2] == 's' && section_name[3] == 's') {
-            private_data->memset((void*)shdr[i].sh_addr, 0, shdr[i].sh_size);
-            DCFlushRange((void*)shdr[i].sh_addr, shdr[i].sh_size);
-        } else if(section_name[0] == '.' && section_name[1] == 's' && section_name[2] == 'b' && section_name[3] == 's' && section_name[4] == 's') {
+        if (shdr[i].sh_type == SHT_NOBITS) {
             private_data->memset((void*)shdr[i].sh_addr, 0, shdr[i].sh_size);
             DCFlushRange((void*)shdr[i].sh_addr, shdr[i].sh_size);
         }
@@ -509,7 +500,7 @@ static void loadFunctionPointers(private_data_t * private_data) {
 
     OSDynLoad_Acquire("coreinit", &coreinit_handle);
 
-    unsigned int *functionPtr = 0;
+    unsigned int *functionPtr;
 
     OSDynLoad_FindExport(coreinit_handle, 1, "MEMAllocFromDefaultHeapEx", &functionPtr);
     private_data->MEMAllocFromDefaultHeapEx = (void *(*)(int, int)) *functionPtr;
@@ -557,7 +548,6 @@ int _start(int argc, char **argv) {
                     private_data.memcpy(pElfBuffer, (unsigned char *) ELF_DATA_ADDR, ELF_DATA_SIZE);
                     MAIN_ENTRY_ADDR = load_elf_image(&private_data, pElfBuffer);
                     private_data.MEMFreeToDefaultHeap(pElfBuffer);
-
                 }
                 ELF_DATA_ADDR = 0xDEADC0DE;
                 ELF_DATA_SIZE = 0;
@@ -572,24 +562,21 @@ int _start(int argc, char **argv) {
                 } else {
                     unsigned char *pElfBuffer = NULL;
                     unsigned int uiElfSize = 0;
-                    if (private_data.OSGetTitleID() == 0x000500101004A200L || // mii maker eur
-                        private_data.OSGetTitleID() == 0x000500101004A100L || // mii maker usa
-                        private_data.OSGetTitleID() == 0x000500101004A000L) {   // mii maker jpn
+                    uint64_t tid = private_data.OSGetTitleID();
+                    if (tid == 0x000500101004A200L || // mii maker eur
+                        tid == 0x000500101004A100L || // mii maker usa
+                        tid == 0x000500101004A000L) {   // mii maker jpn
 
                         LoadFileToMem(&private_data, CAFE_OS_SD_PATH WIIU_PATH "/apps/homebrew_launcher/homebrew_launcher.elf", &pElfBuffer, &uiElfSize);
                     }else{
                         break;
                     }
 
-                    if (!pElfBuffer) {
-                        private_data.OSFatal("Failed to load homebrew_launcher.elf");
+                    MAIN_ENTRY_ADDR = load_elf_image(&private_data, pElfBuffer);
+                    if (MAIN_ENTRY_ADDR == 0) {
+                        private_data.OSFatal("Can't load homebrew_launcher.elf");
                     } else {
-                        MAIN_ENTRY_ADDR = load_elf_image(&private_data, pElfBuffer);
-                        if (MAIN_ENTRY_ADDR == 0) {
-                            private_data.OSFatal("Failed to load homebrew_launcher.elf");
-                        } else {
-                            private_data.MEMFreeToDefaultHeap(pElfBuffer);
-                        }
+                        private_data.MEMFreeToDefaultHeap(pElfBuffer);
                     }
                 }
             } else {

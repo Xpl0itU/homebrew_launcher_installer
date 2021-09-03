@@ -36,9 +36,11 @@ INCLUDES	:=
 # options for code generation
 #---------------------------------------------------------------------------------
 CFLAGS	:=  -std=gnu11 -mrvl -mcpu=750 -meabi -mhard-float -ffast-math -fno-builtin \
-		    -Os -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing $(INCLUDE)
+		    -Os -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing \
+		    -ffunction-sections -fdata-sections $(INCLUDE)
 CXXFLAGS := -std=gnu++11 -mrvl -mcpu=750 -meabi -mhard-float -ffast-math \
-		    -O3 -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing $(INCLUDE)
+		    -O3 -Wall -Wextra -Wno-unused-parameter -Wno-strict-aliasing \
+		    -ffunction-sections -fdata-sections $(INCLUDE)
 ASFLAGS	:= -mregnames
 LDFLAGS	:= -nostartfiles -Wl,--gc-sections
 
@@ -140,7 +142,7 @@ $(OUTPUT).h: $(OFILES)
 $(OUTPUT).c: $(OUTPUT).elf
 	@raw2c $<
 	@cp $(TARGET).c $@
-    
+
 $(OUTPUT).h: $(OUTPUT).c
 	@cp $(TARGET).h $@
 
