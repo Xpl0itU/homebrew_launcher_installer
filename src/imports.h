@@ -270,6 +270,8 @@ IMPORT_BEGIN(sysapp);
 IMPORT(SYSRelaunchTitle);
 IMPORT(_SYSGetSystemApplicationTitleId);
 IMPORT(SYSLaunchMenu);
+IMPORT(SYSCheckTitleExists);
+IMPORT(SYSLaunchTitle);
 IMPORT(_SYSLaunchMenuWithCheckingAccount);
 
 IMPORT_END();

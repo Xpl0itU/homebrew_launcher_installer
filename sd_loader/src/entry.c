@@ -588,11 +588,10 @@ int _start(int argc, char **argv) {
                             unsigned char* pCfgBuffer = NULL;
                             unsigned int uiCfgSize = 0;
                             LoadFileToMem(&private_data, CAFE_OS_SD_PATH WIIU_PATH "/apps/homebrew_launcher/boot.bin", &pCfgBuffer, &uiCfgSize);
-                            if (pCfgBuffer) {
-                                LoadFileToMem(&private_data, (char*)pCfgBuffer, &pElfBuffer, &uiElfSize);
-                                past_initial_load = 0xCAFEC0DE;
-                                private_data.MEMFreeToDefaultHeap(pCfgBuffer);
-                            }
+                            
+                            LoadFileToMem(&private_data, CAFE_OS_SD_PATH WIIU_PATH "/apps/mocha.elf", &pElfBuffer, &uiElfSize);
+                            past_initial_load = 0xCAFEC0DE;
+                            private_data.MEMFreeToDefaultHeap(pCfgBuffer);
                         }
 
                         if (!pElfBuffer) {

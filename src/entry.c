@@ -271,7 +271,14 @@ int _start(int argc, char **argv) {
                 }
             }
         }
-        SYSLaunchMenu();
+        //SYSLaunchMenu();
+        if(SYSCheckTitleExists(0x000500101004A200L)) {
+            SYSLaunchTitle(0x000500101004A200L); //eur
+        } else if(SYSCheckTitleExists(0x000500101004A100L)) {
+            SYSLaunchTitle(0x000500101004A100L); //usa
+        } else if(SYSCheckTitleExists(0x000500101004A000L)) {
+            SYSLaunchTitle(0x000500101004A000L); //jpn
+        }
 
         while (CheckRunning()) {
             // wait.
